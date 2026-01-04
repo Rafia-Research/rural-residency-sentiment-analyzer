@@ -42,6 +42,9 @@ Pillow>=10.1.0
 # Environment & Config
 python-dotenv>=1.0.0
 
+# Gemini API for deep analysis
+google-generativeai>=0.3.0
+
 # GUI - Menu Bar App (v2 feature)
 rumps>=0.4.0
 

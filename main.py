@@ -156,6 +156,7 @@ Examples:
   python main.py --backfill-only    # First run: fetch 24 months of data
   python main.py --incremental      # Daily runs: fetch only new posts
   python main.py                    # Full refresh
+  python main.py --deep-analysis    # Run Gemini deep-dive on existing data
         """
     )
     parser.add_argument(
@@ -173,6 +174,17 @@ Examples:
         action="store_true",
         help="Validate configuration without running pipeline"
     )
+    parser.add_argument(
+        "--deep-analysis",
+        action="store_true",
+        help="Run Gemini deep-dive on top negative posts (requires GEMINI_API_KEY)"
+    )
+    parser.add_argument(
+        "--deep-n-posts",
+        type=int,
+        default=100,
+        help="Number of posts for deep analysis (default: 100)"
+    )
     
     args = parser.parse_args()
     
@@ -183,6 +195,30 @@ Examples:
         print(f"BERTopic enabled: {ENABLE_BERTOPIC}")
         print(f"Apify Proxy Groups: {APIFY_PROXY_GROUPS if APIFY_PROXY_GROUPS else 'Auto'}")
         sys.exit(0)
+    
+    # Deep analysis only mode
+    if args.deep_analysis:
+        from deep_analysis import run_deep_analysis, summarize_insights
+        import json
+        
+        logger = setup_logging()
+        logger.info("Running Gemini deep analysis on existing data...")
+        
+        input_file = OUTPUT_DIR / "reddit_sentiment.csv"
+        if not input_file.exists():
+            logger.error(f"No data found at {input_file}. Run the pipeline first.")
+            sys.exit(1)
+        
+        df = pd.read_csv(input_file)
+        insights = run_deep_analysis(df, n_posts=args.deep_n_posts)
+        
+        if len(insights) > 0:
+            summary = summarize_insights(insights)
+            logger.info(f"Deep analysis complete. Summary:\n{json.dumps(summary, indent=2)}")
+            sys.exit(0)
+        else:
+            logger.error("Deep analysis failed.")
+            sys.exit(1)
     
     if args.incremental:
         mode = "incremental"
@@ -197,3 +233,4 @@ Examples:
 
 if __name__ == "__main__":
     main()
+
