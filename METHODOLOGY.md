@@ -62,4 +62,3 @@ graph LR
     Analysis --> Data[Clean CSV Data]
     Data --> Dashboard[Power BI Dashboard]
 ```
-The entire system runs locally on secure OHSU hardware (or compliant cloud), ensuring data governance control.
