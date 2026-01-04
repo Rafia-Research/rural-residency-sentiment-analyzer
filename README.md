@@ -7,6 +7,8 @@
 ## Executive Summary
 Rural residency programs face a recruitment and retention crisis, yet traditional surveys fail to capture the raw, unfiltered reasons why physicians leave. "Why They Leave" analyzes 24 months of Reddit discussions to identify the root causes of attrition using natural language processing and sentiment analysis. This tool provides distinct signals on recruitment, retention, and alumni career paths for OHSU Graduate Medical Education stakeholders.
 
+📖 **[Read the Plain-English Methodology](METHODOLOGY.md)** — How this tool works, explained for non-technical stakeholders.
+
 ## Live Dashboard
 *Power BI dashboard available upon request — contains sensitive workforce data.*
 
