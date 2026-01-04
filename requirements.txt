@@ -45,8 +45,8 @@ python-dotenv>=1.0.0
 # Gemini API for deep analysis
 google-generativeai>=0.3.0
 
-# GUI - Menu Bar App (v2 feature)
-rumps>=0.4.0
+# GUI - Menu Bar App (macOS only)
+rumps>=0.4.0; sys_platform == "darwin"
 
 # Testing
 pytest>=7.4.3
