@@ -169,8 +169,36 @@ def fetch_from_apify(since_timestamp: datetime = None) -> pd.DataFrame:
             
         # 6. Apply Timestamp Filter (if needed)
         if 'timestamp' in df.columns:
-            # Ensure timestamp is datetime
-            df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True, errors='coerce')
+            # Apify returns 'createdAt' as Unix epoch SECONDS (e.g., 1641852316)
+            # We need to detect if it's a number and convert properly
+            
+            def parse_timestamp(val):
+                """Convert various timestamp formats to datetime."""
+                if pd.isna(val):
+                    return pd.NaT
+                # If it's already a datetime, return it
+                if isinstance(val, pd.Timestamp):
+                    return val
+                # If it's a number (Unix epoch seconds), convert it
+                if isinstance(val, (int, float)):
+                    try:
+                        return pd.Timestamp(val, unit='s', tz='UTC')
+                    except:
+                        return pd.NaT
+                # If it's a string that looks like a number, convert it
+                if isinstance(val, str):
+                    try:
+                        # Check if it's a numeric string (Unix timestamp)
+                        if val.replace('.', '').isdigit():
+                            return pd.Timestamp(float(val), unit='s', tz='UTC')
+                        # Otherwise try parsing as ISO format
+                        return pd.to_datetime(val, utc=True)
+                    except:
+                        return pd.NaT
+                return pd.NaT
+            
+            df['timestamp'] = df['timestamp'].apply(parse_timestamp)
+            logger.info(f"Parsed timestamps. Sample: {df['timestamp'].head(3).tolist()}")
             
             # Filter null timestamps (impute with current time if critical, or drop? Instructions say: "Use current time, add timestamp_imputed flag")
             df['timestamp_imputed'] = False
