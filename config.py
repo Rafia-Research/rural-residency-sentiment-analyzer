@@ -26,68 +26,179 @@ APIFY_RUN_TIMEOUT = 300  # Seconds
 
 # === DATA COLLECTION ===
 BACKFILL_MONTHS = 24  # Options: 6, 12, 24
-SUBREDDITS = ["Residency", "medicalschool", "medicine"]
+# Expanded subreddit list to capture rural-specific discussions
+SUBREDDITS = [
+    "Residency",
+    "medicalschool", 
+    "medicine",
+    "FamilyMedicine",          # FM is the primary rural pipeline
+    "emergencymedicine",        # Rural EM is a major topic
+    "physicianassistant",       # Rural PA workforce
+    "nursepractitioner",        # Rural NP scope issues
+    "Noctor",                   # Scope disputes & rural implications
+    "premed",                   # Early career thinking about rural
+    "whitecoatinvestor",        # Financial decisions about rural
+    "locums",                   # Locums as rural alternative
+    "IMGreddit",                # IMGs often go rural for visas
+]
 UPDATE_FREQUENCY_HOURS = 6  # 4x daily
 
-# === SEARCH TERMS (Organized by category for analysis) ===
+# === SEARCH TERMS (Targeted for "Why They Leave" research) ===
 SEARCH_TERMS = {
+    # WHY THEY COME (Initial Attraction)
     "recruitment": [
         "rural residency",
-        "rural rotation",
+        "rural track",
+        "rural training track",
+        "RTT program",
         "ranked rural",
-        "rural vs urban",
-        "primary care rural",
-        "underserved",
-        "NHSC",
-        "loan repayment rural",
-        "rural match",
+        "matched rural",
+        "underserved area",
+        "underserved community",
+        "NHSC scholarship",
+        "NHSC loan repayment",
+        "loan forgiveness rural",
+        "PSLF rural",
+        "state loan repayment",
+        "sign on bonus rural",
+        "J1 waiver rural",
+        "visa waiver underserved",
+        "IMG rural",
     ],
+    
+    # THE TRAILING SPOUSE PROBLEM (Major attrition driver)
     "partner_family": [
-        "spouse rural",
-        "partner job rural",
-        "wife career",
-        "husband job",
-        "significant other rural",
-        "dual career",
-        "family rural",
-        "kids rural",
-        "relationship rural",
+        "spouse won't move",
+        "partner hates rural",
+        "wife career rural",
+        "husband job rural",
+        "trailing spouse",
+        "dual physician couple rural",
+        "two body problem rural",
+        "long distance residency",
+        "relationship strain residency",
+        "divorced during residency",
+        "marriage residency",
+        "kids in rural",
+        "schools rural area",
+        "childcare rural",
+        "isolated with kids",
+        "no family nearby",
+        "significant other moved",
     ],
+    
+    # WHY THEY LEAVE (Direct attrition signals)
     "retention": [
         "quit rural",
-        "left rural",
+        "left rural practice",
         "leaving rural",
+        "moved back to city",
+        "couldn't stay rural",
+        "only stayed 2 years",
+        "contract buyout",
         "burned out rural",
-        "rural attending",
-        "rural faculty",
-        "contract rural",
-        "moved back city",
-        "years rural",
+        "rural burnout",
+        "isolated and burned out",
+        "regret going rural",
+        "regret rural",
+        "wish I stayed urban",
+        "should have stayed",
+        "never go rural",
+        "don't go rural",
+        "rural was a mistake",
+        "left after loan repayment",
+        "finished NHSC and left",
+        "3 year commitment rural",
     ],
-    "oregon_ohsu": [
-        "Oregon residency",
-        "OHSU",
-        "Portland residency",
-        "Pacific Northwest residency",
-        "PNW residency",
-        "Oregon rural",
-    ],
-    "compensation": [
-        "rural salary",
-        "rural vs urban pay",
-        "attending pay rural",
-        "rural lifestyle",
-        "isolation rural",
+    
+    # ISOLATION & LIFESTYLE (Major complaint)
+    "isolation": [
         "middle of nowhere",
-        "student loans rural",
+        "hours from anything",
+        "nothing to do rural",
+        "no restaurants",
+        "no culture",
+        "boring town",
+        "small town everyone knows",
+        "gossip small town",
+        "no privacy rural",
+        "dating rural",
+        "single in rural",
+        "no dating pool",
+        "where to meet people rural",
+        "friends rural area",
+        "lonely rural",
+        "isolated physician",
+        "only doctor in town",
     ],
+    
+    # SCOPE & BACKUP (Clinical isolation)
+    "clinical_isolation": [
+        "no backup rural",
+        "only physician",
+        "no specialist",
+        "transfer patient hours",
+        "medevac",
+        "critical access hospital",
+        "CAH hospital",
+        "25 bed hospital",
+        "scope creep rural",
+        "NP independence rural",
+        "mid-level supervision rural",
+        "solo practice rural",
+        "call every night",
+        "1 in 2 call",
+        "1 in 3 call",
+        "always on call",
+        "never off rural",
+    ],
+    
+    # MONEY (Surprisingly NOT enough to retain)
+    "compensation": [
+        "rural salary not worth",
+        "paid more but miserable",
+        "money isn't everything rural",
+        "golden handcuffs rural",
+        "contract trap rural",
+        "non-compete rural",
+        "can't leave contract",
+        "buyout clause",
+        "loan repayment trap",
+        "stuck for 3 years",
+        "RVU rural",
+        "productivity rural",
+        "admin burden rural",
+        "panel size rural",
+    ],
+    
+    # OREGON/PNW SPECIFIC
+    "oregon_ohsu": [
+        "OHSU rural",
+        "Oregon rural residency",
+        "Cascades East",
+        "Oregon rural track",
+        "Eastern Oregon",
+        "Klamath Falls residency",
+        "Bend Oregon medicine",
+        "Portland vs rural Oregon",
+        "Pacific Northwest rural",
+        "Washington rural",
+        "Idaho rural",
+        "Montana rural",
+    ],
+    
+    # CAREER TRAJECTORY (Why rural feels like a dead end)
     "career": [
-        "rural fellowship",
-        "rural career",
-        "scope of practice rural",
-        "mid-level rural",
-        "autonomy rural",
-        "rural mentorship",
+        "rural career dead end",
+        "no advancement rural",
+        "can't do fellowship rural",
+        "stuck in rural",
+        "pigeonholed rural",
+        "rural on CV",
+        "coming back from rural",
+        "re-entering urban",
+        "transition rural to urban",
+        "escape rural",
     ],
 }
 
@@ -155,8 +266,19 @@ FACULTY_KEYWORDS = [
 FACULTY_KEYWORDS_SPECIAL = ["pd", "apd"]
 
 ATTRITION_KEYWORDS = [
-    "quit", "left", "leaving", "moved", "burned out", "burnout", "resign",
-    "resigned", "quitting", "moving back", "transferred"
+    # Direct leaving language
+    "quit", "quitting", "left", "leaving", "moved away", "moving back",
+    "burned out", "burnout", "burnt out", "resign", "resigned",
+    "transferred", "couldn't stay", "had to leave", "forced to leave",
+    # Regret signals
+    "regret", "mistake", "worst decision", "should have", "wish I had",
+    "never should have", "don't go", "wouldn't recommend",
+    # Contract/commitment language
+    "finished my contract", "contract ended", "buyout", "non-compete",
+    "3 year commitment", "2 years and left", "left after NHSC",
+    # Escape language  
+    "escape", "get out", "couldn't wait to leave", "counting down",
+    "trapped", "stuck", "prison", "sentence",
 ]
 
 # === PII WHITELIST (False positive prevention) ===
