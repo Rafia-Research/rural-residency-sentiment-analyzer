@@ -1,0 +1,108 @@
+# ===========================================
+# Environment & Secrets
+# ===========================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ===========================================
+# Python
+# ===========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+*.manifest
+*.spec
+
+# ===========================================
+# Virtual Environments
+# ===========================================
+.venv/
+venv/
+ENV/
+env/
+.conda/
+
+# ===========================================
+# Output Files (Large, regenerated)
+# ===========================================
+output/*.csv
+output/*.json
+output/*.png
+logs/*.log
+
+# Keep directory structure
+!output/.gitkeep
+!logs/.gitkeep
+
+# ===========================================
+# Models (Downloaded on first run)
+# ===========================================
+models/
+*.bin
+*.safetensors
+
+# ===========================================
+# IDE & Editors
+# ===========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.pydevproject
+.settings/
+
+# ===========================================
+# macOS
+# ===========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ===========================================
+# Jupyter Notebooks
+# ===========================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ===========================================
+# Testing & Coverage
+# ===========================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.coverage
+.hypothesis/
+
+# ===========================================
+# Type Checking
+# ===========================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ===========================================
+# Distribution
+# ===========================================
+*.tar.gz
+*.zip
