@@ -13,8 +13,8 @@ load_dotenv()
 
 # === PATHS ===
 BASE_DIR = Path(__file__).parent
-OUTPUT_DIR = BASE_DIR / "output"
-LOGS_DIR = BASE_DIR / "logs"
+OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", BASE_DIR / "output"))
+LOGS_DIR = Path(os.environ.get("LOGS_DIR", BASE_DIR / "logs"))
 
 # === API CREDENTIALS (Use environment variables in production) ===
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN", "your-token-here")
@@ -25,7 +25,7 @@ APIFY_RUN_TIMEOUT = 300  # Seconds
 
 
 # === DATA COLLECTION ===
-BACKFILL_MONTHS = 24  # Options: 6, 12, 24
+BACKFILL_MONTHS = int(os.environ.get("BACKFILL_MONTHS", "24"))
 # Expanded subreddit list to capture rural-specific discussions
 SUBREDDITS = [
     "Residency",
@@ -228,10 +228,10 @@ SUPPORTED_LANGUAGES = ["en"]  # English only
 # === MEDICAL RELEVANCE FILTER ===
 # Posts must contain at least one of these terms to be considered relevant
 MEDICAL_TERMS = [
-    "residency", "resident", "attending", "physician", "doctor", "md", "do",
+    "residency", "resident", "attending", "physician", "doctor",
     "rotation", "match", "program", "fellowship", "intern", "pgy", "medical school",
     "med school", "clinical", "hospital", "clinic", "patient", "surgery", "medicine",
-    "fm", "family medicine", "im", "internal medicine", "pediatrics", "obgyn",
+    "family medicine", "internal medicine", "pediatrics", "obgyn",
     "psychiatry", "emergency", "radiology", "pathology", "anesthesia", "icu",
     "wards", "step 1", "step 2", "usmle", "comlex", "eras", "nrmp", "soap"
 ]

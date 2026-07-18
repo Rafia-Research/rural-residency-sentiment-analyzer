@@ -160,8 +160,13 @@ def run_deep_analysis(
     logger.info(f"Running deep analysis on {len(negative_posts)} most negative posts...")
     
     # Prepare posts for analysis
+    id_column = 'record_id' if 'record_id' in negative_posts.columns else 'id'
+    text_column = 'redacted_text' if 'redacted_text' in negative_posts.columns else None
+    if text_column is None:
+        logger.error("Deep analysis requires redacted_text; refusing to send unredacted content.")
+        return pd.DataFrame()
     posts_to_analyze = [
-        {"id": row['id'], "text": row.get('clean_text', row.get('text', ''))}
+        {"id": row[id_column], "text": row[text_column]}
         for _, row in negative_posts.iterrows()
     ]
     

@@ -160,10 +160,11 @@ def create_topic_summary(df: pd.DataFrame, topic_model) -> pd.DataFrame:
         return pd.DataFrame()
         
     # Group by Topic
+    count_column = 'record_id' if 'record_id' in df.columns else 'id'
     summary = df.groupby('dominant_topic').agg({
-        'id': 'count',
+        count_column: 'count',
         'sentiment_score': 'mean'
-    }).rename(columns={'id': 'post_count', 'sentiment_score': 'avg_sentiment'})
+    }).rename(columns={count_column: 'post_count', 'sentiment_score': 'avg_sentiment'})
     
     summary = summary.reset_index().rename(columns={'dominant_topic': 'topic_id'})
     

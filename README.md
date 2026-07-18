@@ -5,17 +5,17 @@
 ![Status Portfolio](https://img.shields.io/badge/status-portfolio_project-orange.svg)
 
 ## Executive Summary
-Rural residency programs face a recruitment and retention crisis, yet traditional surveys fail to capture the raw, unfiltered reasons why physicians leave. "Why They Leave" analyzes 24 months of Reddit discussions to identify the root causes of attrition using natural language processing and sentiment analysis. This tool provides distinct signals on recruitment, retention, and alumni career paths for OHSU Graduate Medical Education stakeholders.
+Rural residency programs face persistent recruitment and retention challenges. "Why They Leave" analyzes a configurable 24-month window of public Reddit discussions to surface exploratory themes associated with recruitment, retention, and career decisions. It is a hypothesis-generation tool, not a representative survey or causal study.
 
 ## The Problem
 Recruiting physicians to rural areas is critical for healthcare equity, but attrition rates remain high. Exit interviews are often polite and non-specific. To solve this, we need to hear what residents say to each other when they think no administrators are listening.
 
 ## The Solution
-- **Scrapes** Reddit (r/Residency, r/medicalschool) for 24 months of historical data
+- **Collects** public discussions from configured medical communities for a bounded 24-month window
 - **Filters** for medical context and rural-specific keywords
 - **Analyzes** sentiment using a transformer model trained on social media (RoBERTa)
-- **Protects** privacy by automatically redacting names, locations, and dates (HIPAA-aligned)
-- **Visualizes** trends in recruitment, partner employment, and compensation concerns
+- **Protects** privacy by redacting detected PII, pseudonymizing source IDs, and excluding usernames and source URLs from analytics outputs
+- **Produces** Power BI-ready CSVs for exploring recruitment, partner employment, and compensation themes
 
 ## Tech Stack
 
@@ -25,20 +25,20 @@ Recruiting physicians to rural areas is critical for healthcare equity, but attr
 | **Data Collection** | ![Apify](https://img.shields.io/badge/-Apify-96D600?logo=apify&logoColor=white) | Apify Reddit Scraper |
 | **NLP Model** | ![Hugging Face](https://img.shields.io/badge/-Hugging_Face-FFD21E?logo=huggingface&logoColor=black) | cardiffnlp/twitter-roberta-base-sentiment-latest |
 | **PII Detection** | ![Microsoft](https://img.shields.io/badge/-Microsoft_Presidio-0078D4?logo=microsoft&logoColor=white) | Microsoft Presidio |
-| **Visualization** | ![Power BI](https://img.shields.io/badge/-Power_BI-F2C811?logo=powerbi&logoColor=black) | Power BI Service |
+| **Visualization** | ![Power BI](https://img.shields.io/badge/-Power_BI-F2C811?logo=powerbi&logoColor=black) | Power BI-ready CSV exports |
 | **Hardware** | ![Apple M1](https://img.shields.io/badge/-Apple_Silicon-555555?logo=apple&logoColor=white) | M1 Optimized (MPS acceleration) |
 
 ## Architecture Diagram
 
 ```mermaid
 graph LR
-    A[Reddit API] -->|Apify| B(Ingest Script)
+    A[Public Reddit Search] -->|Apify| B(Ingest Script)
     B --> C{Preprocess}
     C -->|Clean Text| D[Sentiment Analysis]
-    C -->|Detect PII| E[Redaction Engine]
-    D --> F[CSV Export]
-    E --> F
-    F --> G[Power BI Dashboard]
+    D --> E[PII Redaction]
+    E --> F[Pseudonymized Safe Dataset]
+    F --> G[CSV Export]
+    G --> H[Power BI or Other Analysis]
 ```
 
 ## Project Structure
@@ -108,8 +108,8 @@ Analyze the last 24 months of data:
 python main.py --backfill-only
 ```
 
-### Daily Updates
-Run incremental update (fetches new posts since last run):
+### Incremental Updates
+Fetch new records, merge them with the prior safe export, deduplicate by pseudonymous record ID, and recalculate trends:
 ```bash
 python main.py --incremental
 ```
@@ -125,25 +125,31 @@ All settings are managed in `config.py`. Key feature flags:
 
 - `ENABLE_BERTOPIC`: Enable/disable advanced topic modeling (v2 feature)
 - `ENABLE_ROLLING_AVERAGES`: Calculate 3/6/12 month trends
-- `PII_ACTION`: "redact", "flag", or "none"
+- `BACKFILL_MONTHS`: Historical collection window, also configurable through `.env`
 
 ## Output Files
 
 | File | Description |
 |------|-------------|
-| `reddit_sentiment.csv` | Main dataset with sentiment scores and flags |
+| `reddit_sentiment.csv` | Pseudonymized dataset containing redacted text, sentiment scores, and flags |
 | `sentiment_by_month.csv` | Aggregated trends over time |
 | `negative_keywords.csv` | Top terms appearing in negative posts |
-| `pii_audit_log.csv` | Log of redacted entities (privacy audit trail) |
+| `pii_audit_log.csv` | Pseudonymized log of detected and redacted entities |
 | `topic_summary.csv` | Summary of discovered themes (if enabled) |
 | `run_metadata.json` | Execution statistics and version info |
+
+For a portfolio-friendly preview of the safe output schema, see
+[`examples/synthetic_reddit_sentiment.csv`](examples/synthetic_reddit_sentiment.csv).
+The example is entirely synthetic and contains no collected Reddit content.
 
 ## Methodology
 For a plain-English explanation of how this tool works, see [METHODOLOGY.md](METHODOLOGY.md).
 
 ## Limitations
 - **Reddit Bias**: Users skew younger and are self-selecting.
-- **Sarcasm**: While RoBERTa is state-of-the-art, distinct sarcasm without tone indicators can be misidentified.
+- **Query Selection Bias**: Search terms intentionally target rural-workforce concerns, so sentiment percentages are not population prevalence estimates.
+- **Clustered Discussions**: Posts and their comments are related observations and should not be interpreted as independent survey responses.
+- **Sarcasm and Domain Fit**: A general social-media sentiment model can misread sarcasm, clinical language, and local context.
 - **False Positives**: PII detection favors caution; some generic terms might be redacted.
 
 ## Future Enhancements

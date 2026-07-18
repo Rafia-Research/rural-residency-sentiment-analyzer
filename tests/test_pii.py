@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from pii import detect_and_redact_pii, is_whitelisted
 
+pytestmark = pytest.mark.integration
+
 class TestPIIWhitelist:
     """Test suite for whitelist functionality."""
     

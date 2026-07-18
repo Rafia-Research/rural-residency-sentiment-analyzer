@@ -207,10 +207,7 @@ def get_sentiment_scores(texts: list, model, tokenizer, device) -> list:
             
     except Exception as e:
         logger.error(f"Sentiment inference failed: {e}")
-        # Return defaults for this batch if it crashes?
-        # Better to log and maybe return partial? 
-        # For now, let's just return defaults for failed batch to avoid pipeline crash
-        pass
+        raise RuntimeError("Sentiment inference failed; refusing to record failed rows as neutral.") from e
         
     return batch_results
 

@@ -25,6 +25,29 @@ from utils import (
 
 logger = setup_logging()
 
+
+def filter_by_time_window(
+    df: pd.DataFrame,
+    since_timestamp: datetime = None,
+    now: pd.Timestamp = None
+) -> pd.DataFrame:
+    """Apply either the incremental watermark or configured backfill window."""
+    if df.empty or 'timestamp' not in df.columns:
+        return df
+
+    if since_timestamp:
+        if since_timestamp.tzinfo is None:
+            since_timestamp = since_timestamp.replace(tzinfo=timezone.utc)
+        logger.info(f"Filtering for posts after {since_timestamp}")
+        return df[df['timestamp'] > since_timestamp]
+
+    reference_time = now if now is not None else pd.Timestamp.now(tz='UTC')
+    if reference_time.tzinfo is None:
+        reference_time = reference_time.tz_localize('UTC')
+    backfill_cutoff = reference_time - pd.DateOffset(months=BACKFILL_MONTHS)
+    logger.info(f"Filtering backfill to records on or after {backfill_cutoff}")
+    return df[df['timestamp'] >= backfill_cutoff]
+
 @retry_with_backoff(max_retries=MAX_RETRIES, delay=RETRY_DELAY_SECONDS)
 def fetch_from_apify(since_timestamp: datetime = None) -> pd.DataFrame:
     """
@@ -105,13 +128,14 @@ def fetch_from_apify(since_timestamp: datetime = None) -> pd.DataFrame:
     # to fetch and then filter or use relative time limits if available.
     # We will rely on post-fetch filtering for precise timestamp cutoff.
     
-    start_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs?token={APIFY_TOKEN}"
+    headers = {"Authorization": f"Bearer {APIFY_TOKEN}"}
+    start_url = f"https://api.apify.com/v2/actors/{APIFY_ACTOR_ID}/runs"
     
     logger.info(f"Starting Apify actor run for {len(all_search_terms)} search terms...")
     
     try:
         # 1. Start the Actor
-        response = requests.post(start_url, json=run_input)
+        response = requests.post(start_url, json=run_input, headers=headers, timeout=30)
         response.raise_for_status()
         run_data = response.json().get('data', {})
         run_id = run_data.get('id')
@@ -127,10 +151,15 @@ def fetch_from_apify(since_timestamp: datetime = None) -> pd.DataFrame:
         # or just poll manually. Here we construct the polling URL.
         # Actually, the run endpoint usually returns immediately. We need to poll.
         
+        deadline = time.monotonic() + APIFY_RUN_TIMEOUT
         while True:
+            if time.monotonic() >= deadline:
+                logger.error(f"Apify run exceeded {APIFY_RUN_TIMEOUT} seconds.")
+                return pd.DataFrame()
+
             # Check status
-            status_url = f"https://api.apify.com/v2/acts/{APIFY_ACTOR_ID}/runs/{run_id}?token={APIFY_TOKEN}"
-            status_res = requests.get(status_url)
+            status_url = f"https://api.apify.com/v2/actor-runs/{run_id}"
+            status_res = requests.get(status_url, headers=headers, timeout=30)
             status_res.raise_for_status()
             status_data = status_res.json().get('data', {})
             status = status_data.get('status')
@@ -149,9 +178,9 @@ def fetch_from_apify(since_timestamp: datetime = None) -> pd.DataFrame:
         
         # 3. Fetch Dataset
         dataset_id = status_data.get('defaultDatasetId')
-        dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={APIFY_TOKEN}&format=json"
+        dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?format=json"
         
-        data_res = requests.get(dataset_url)
+        data_res = requests.get(dataset_url, headers=headers, timeout=60)
         data_res.raise_for_status()
         items = data_res.json()
         
@@ -208,13 +237,7 @@ def fetch_from_apify(since_timestamp: datetime = None) -> pd.DataFrame:
                 df.loc[null_mask, 'timestamp'] = pd.Timestamp.now(tz='UTC')
                 df.loc[null_mask, 'timestamp_imputed'] = True
 
-            if since_timestamp:
-                logger.info(f"Filtering for posts after {since_timestamp}")
-                # Ensure since_timestamp is consistent timezone-wise
-                if since_timestamp.tzinfo is None:
-                    since_timestamp = since_timestamp.replace(tzinfo=timezone.utc)
-                    
-                df = df[df['timestamp'] > since_timestamp]
+            df = filter_by_time_window(df, since_timestamp=since_timestamp)
         
         return df
 
