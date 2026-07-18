@@ -14,6 +14,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sentiment import analyze_sentiment_batch, load_model
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture(scope="module")
 def loaded_model():

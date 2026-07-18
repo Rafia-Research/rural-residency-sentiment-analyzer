@@ -33,7 +33,10 @@ from sentiment import analyze_sentiment_batch
 from pii import detect_and_redact_pii
 from keywords import flag_all_keywords
 from topics import extract_topics
-from export import export_all_csvs, calculate_aggregations
+from export import (
+    export_all_csvs, calculate_aggregations, build_safe_export_dataframe,
+    merge_incremental_history, build_safe_audit_dataframe, merge_incremental_audit
+)
 
 
 def run_pipeline(mode: str = "full") -> bool:
@@ -115,6 +118,14 @@ def run_pipeline(mode: str = "full") -> bool:
         partner_count = df['mentions_partner'].sum() if 'mentions_partner' in df.columns else 0
         logger.info(f"  Oregon mentions: {oregon_count}, Partner mentions: {partner_count}")
         
+        # Remove direct identifiers before persistence or any optional external analysis.
+        if mode == "incremental":
+            df = merge_incremental_history(df)
+            pii_audit = merge_incremental_audit(pii_audit)
+        else:
+            df = build_safe_export_dataframe(df)
+            pii_audit = build_safe_audit_dataframe(pii_audit)
+
         # === 6. TOPIC MODELING (v2 only) ===
         if ENABLE_BERTOPIC:
             logger.info("Step 6/7: Extracting topics with BERTopic...")

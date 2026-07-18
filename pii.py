@@ -13,6 +13,7 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
 from config import PII_ENTITIES, PII_WHITELIST
+from preprocess import clean_text, truncate_text
 from utils import setup_logging
 
 logger = setup_logging()
@@ -55,6 +56,7 @@ def detect_and_redact_pii(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]
     
     audit_records = []
     redacted_texts = []
+    redacted_clean_texts = []
     pii_detected_flags = []
     pii_types_list = []
     pii_counts = []
@@ -64,6 +66,9 @@ def detect_and_redact_pii(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]
         text = row['original_text']
         
         redacted_text, detections = redact_text(text, analyzer, anonymizer)
+        # Derive model text from the already-redacted source so the cleaned
+        # representation can never reintroduce a value removed above.
+        redacted_clean_text = truncate_text(clean_text(redacted_text))
         
         # Log Audit
         for d in detections:
@@ -74,12 +79,14 @@ def detect_and_redact_pii(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]
         detected_types = list(set([d.entity_type for d in detections]))
         
         redacted_texts.append(redacted_text)
+        redacted_clean_texts.append(redacted_clean_text)
         pii_detected_flags.append(len(detections) > 0)
         pii_types_list.append(",".join(detected_types) if detected_types else "")
         pii_counts.append(len(detections))
         
     # Update DataFrame
     df['redacted_text'] = redacted_texts
+    df['redacted_clean_text'] = redacted_clean_texts
     df['pii_detected'] = pii_detected_flags
     df['pii_types'] = pii_types_list
     df['pii_count'] = pii_counts

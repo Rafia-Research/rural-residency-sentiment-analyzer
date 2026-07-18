@@ -4,6 +4,7 @@ CSV export and aggregation module.
 """
 
 import json
+import hashlib
 from datetime import datetime, timezone
 import pandas as pd
 import pytz
@@ -17,6 +18,90 @@ from utils import setup_logging, convert_timezone, safe_json_save
 
 logger = setup_logging()
 
+SAFE_EXPORT_COLUMNS = [
+    'record_id', 'parent_record_id', 'redacted_text', 'clean_text',
+    'year_month', 'year', 'month', 'day_of_week', 'subreddit', 'type', 'score',
+    'sentiment_score', 'sentiment_label', 'sentiment_confidence',
+    'sentiment_uncertain', 'mentions_oregon', 'mentions_partner',
+    'mentions_faculty', 'mentions_attrition', 'search_category',
+    'is_recruitment', 'is_retention', 'is_alumni', 'keyword_matches',
+    'dominant_topic', 'topic_keywords', 'pii_detected', 'pii_types',
+    'pii_count', 'timestamp_imputed'
+]
+
+
+def pseudonymize_id(value) -> str:
+    """Return a stable pseudonymous identifier for a Reddit record ID."""
+    if pd.isna(value) or value in (None, ''):
+        return ''
+    payload = f"rural-residency-sentiment:v1:{value}".encode('utf-8')
+    return hashlib.sha256(payload).hexdigest()[:20]
+
+
+def build_safe_export_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Create the only row-level representation allowed to reach disk."""
+    safe = df.copy()
+    ensure_timestamp_cols(safe)
+
+    if 'record_id' not in safe.columns:
+        if 'id' not in safe.columns:
+            raise ValueError("Dataset has neither 'id' nor 'record_id'.")
+        safe['record_id'] = safe['id'].map(pseudonymize_id)
+    if 'parent_record_id' not in safe.columns:
+        if 'parent_id' in safe.columns:
+            safe['parent_record_id'] = safe['parent_id'].map(pseudonymize_id)
+        else:
+            safe['parent_record_id'] = ''
+
+    if 'redacted_text' not in safe.columns:
+        raise ValueError("Refusing to export row-level data before PII redaction.")
+
+    if 'redacted_clean_text' in safe.columns:
+        safe['clean_text'] = safe['redacted_clean_text']
+    elif 'clean_text' not in safe.columns:
+        # Existing safe exports do not contain raw text; use their already-redacted text.
+        safe['clean_text'] = safe['redacted_text']
+
+    columns = [column for column in SAFE_EXPORT_COLUMNS if column in safe.columns]
+    return safe.loc[:, columns]
+
+
+def merge_incremental_history(df: pd.DataFrame) -> pd.DataFrame:
+    """Merge a processed incremental batch with the previous safe export."""
+    new_rows = build_safe_export_dataframe(df)
+    existing_path = OUTPUT_DIR / "reddit_sentiment.csv"
+    if not existing_path.exists():
+        return new_rows
+
+    existing = pd.read_csv(existing_path)
+    if 'record_id' not in existing.columns:
+        existing = build_safe_export_dataframe(existing)
+
+    merged = pd.concat([existing, new_rows], ignore_index=True, sort=False)
+    return merged.drop_duplicates(subset=['record_id'], keep='last').reset_index(drop=True)
+
+
+def build_safe_audit_dataframe(pii_audit: pd.DataFrame) -> pd.DataFrame:
+    """Remove source IDs from the PII audit while retaining record linkage."""
+    safe = pii_audit.copy()
+    if 'post_id' in safe.columns:
+        safe['record_id'] = safe['post_id'].map(pseudonymize_id)
+        safe = safe.drop(columns=['post_id'])
+    columns = ['record_id', 'entity_type', 'start_position', 'end_position', 'confidence', 'timestamp']
+    return safe.reindex(columns=columns)
+
+
+def merge_incremental_audit(pii_audit: pd.DataFrame) -> pd.DataFrame:
+    """Append a new safe audit batch to the prior audit log."""
+    new_rows = build_safe_audit_dataframe(pii_audit)
+    existing_path = OUTPUT_DIR / "pii_audit_log.csv"
+    if not existing_path.exists():
+        return new_rows
+    existing = pd.read_csv(existing_path)
+    if 'post_id' in existing.columns:
+        existing = build_safe_audit_dataframe(existing)
+    return pd.concat([existing, new_rows], ignore_index=True, sort=False).drop_duplicates()
+
 def export_all_csvs(df: pd.DataFrame, aggregations: dict, pii_audit: pd.DataFrame, topic_summary: pd.DataFrame) -> None:
     """
     Export all DataFrames to CSVs in OUTPUT_DIR.
@@ -27,11 +112,12 @@ def export_all_csvs(df: pd.DataFrame, aggregations: dict, pii_audit: pd.DataFram
         pii_audit: PII audit log.
         topic_summary: Topic summary.
     """
-    ensure_timestamp_cols(df)
+    safe_df = build_safe_export_dataframe(df)
+    safe_audit = build_safe_audit_dataframe(pii_audit)
     
     # 1. Main Dataset: reddit_sentiment.csv
     logger.info("Exporting reddit_sentiment.csv...")
-    df.to_csv(OUTPUT_DIR / "reddit_sentiment.csv", index=False)
+    safe_df.to_csv(OUTPUT_DIR / "reddit_sentiment.csv", index=False)
     
     # 2. Aggregations: sentiment_by_month.csv
     if 'monthly' in aggregations:
@@ -40,16 +126,16 @@ def export_all_csvs(df: pd.DataFrame, aggregations: dict, pii_audit: pd.DataFram
         
     # 3. Negative Keywords: negative_keywords.csv
     logger.info("Extracting negative keywords...")
-    neg_keywords = extract_negative_keywords(df)
+    neg_keywords = extract_negative_keywords(safe_df)
     neg_keywords.to_csv(OUTPUT_DIR / "negative_keywords.csv", index=False)
     
     # 4. PII Audit: pii_audit_log.csv
     logger.info("Exporting pii_audit_log.csv...")
-    if not pii_audit.empty:
-        pii_audit.to_csv(OUTPUT_DIR / "pii_audit_log.csv", index=False)
+    if not safe_audit.empty:
+        safe_audit.to_csv(OUTPUT_DIR / "pii_audit_log.csv", index=False)
     else:
         # Save empty with header
-        pd.DataFrame(columns=['post_id', 'entity_type', 'start_position', 'end_position', 'confidence', 'timestamp']).to_csv(OUTPUT_DIR / "pii_audit_log.csv", index=False)
+        pd.DataFrame(columns=['record_id', 'entity_type', 'start_position', 'end_position', 'confidence', 'timestamp']).to_csv(OUTPUT_DIR / "pii_audit_log.csv", index=False)
         
     # 5. Topic Summary: topic_summary.csv
     logger.info("Exporting topic_summary.csv...")
@@ -60,7 +146,7 @@ def export_all_csvs(df: pd.DataFrame, aggregations: dict, pii_audit: pd.DataFram
 
     # 6. Metadata: run_metadata.json
     logger.info("Exporting run_metadata.json...")
-    metadata = create_run_metadata(df, pii_audit)
+    metadata = create_run_metadata(safe_df, safe_audit)
     safe_json_save(metadata, OUTPUT_DIR / "run_metadata.json")
 
 def ensure_timestamp_cols(df: pd.DataFrame):
@@ -190,7 +276,8 @@ def create_run_metadata(df: pd.DataFrame, pii_audit: pd.DataFrame) -> dict:
         stats["partner_mention_pct"] = round((df['mentions_partner'].sum() / total) * 100, 1)
         
         if not pii_audit.empty:
-            stats["pii_redacted_count"] = int(pii_audit['post_id'].nunique())
+            audit_id_column = 'record_id' if 'record_id' in pii_audit.columns else 'post_id'
+            stats["pii_redacted_count"] = int(pii_audit[audit_id_column].nunique())
     
     return {
         "run_timestamp": now.isoformat(),

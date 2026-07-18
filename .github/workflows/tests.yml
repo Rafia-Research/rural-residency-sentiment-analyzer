@@ -1,0 +1,19 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fast-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install fast-test dependencies
+        run: pip install pandas numpy pytz scikit-learn python-dotenv requests pytest
+      - name: Run fast tests
+        run: pytest tests/test_export_privacy.py tests/test_ingest_window.py -q

@@ -5,7 +5,7 @@ This document explains how the Rural Residency Sentiment Analyzer turns messy in
 ## 1. The Data
 **Where it comes from**: We collect public discussions from Reddit, specifically looking at communities where medical professionals gather: r/Residency, r/medicalschool, and r/medicine.
 
-**Why Reddit?**: Traditional exit interviews are formal and often guarded. Reddit provides a platform for anonymous, unfiltered, "peer-to-peer" honest discussions. This captures the *real* reasons for physician attrition that often don't make it onto official survey forms.
+**Why Reddit?**: Reddit provides informal peer-to-peer discussions that can reveal themes worth testing in formal workforce research. Posters' identities and professional roles cannot be verified, so these discussions are treated as exploratory signals rather than ground truth.
 
 **What we search for**: The system listens for 6 specific conversation categories:
 1.  **Recruitment**: Choosing programs, matching, ranking rural tracks.
@@ -15,11 +15,11 @@ This document explains how the Rural Residency Sentiment Analyzer turns messy in
 5.  **Compensation**: Salary, loans, cost of living.
 6.  **Career**: Scope of practice, mentorship, autonomy.
 
-**Volume**: We track the last 24 months of history and update 4 times daily to catch new trends as they emerge.
+**Volume**: Backfills are restricted to a configurable 24-month window. Incremental runs can be scheduled as often as the research workflow requires.
 
 ## 2. How We Measure Sentiment
 We use a "Sentiment Analysis" model to grade every post.
-- **Tools**: We use **RoBERTa**, an AI model from Hugging Face (specifically `cardiffnlp/twitter-roberta-base-sentiment-latest`). This model was trained on millions of social media posts, making it very good at understanding informal internet slang, sarcasm, and emojis—unlike older business tools.
+- **Tools**: We use **RoBERTa** from Hugging Face (`cardiffnlp/twitter-roberta-base-sentiment-latest`). It was trained on social-media text, but its performance must still be validated on healthcare-workforce discussions.
 - **The Score**: Every post gets a score from **-1.0 (Very Negative)** to **+1.0 (Very Positive)**.
     - *Example*: "I love the autonomy of rural practice!" → **+0.9** (Positive)
     - *Example*: "The call schedule is brutal and I miss the city." → **-0.8** (Negative)
@@ -31,13 +31,16 @@ Imagine dumping 5,000 letters onto a table. "Topic Modeling" is like having a ro
 - *Example*: It might create a pile for "Housing Shortages" even if we never programmed it to search for "housing".
 
 ## 4. How We Protect Privacy
-Even though Reddit is public, we treat all data with HIPAA-aware standards.
+Even though Reddit is public, we apply privacy-minimizing controls before analytics data reaches disk or an optional external model.
 - **PII Detection**: We use Microsoft Presidio to scan every post for:
     - Names (e.g., "Dr. Smith")
     - Locations (e.g., "Main Street Clinic")
     - Emails & Phone Numbers
 - **Redaction**: These are automatically replaced with `[REDACTED]`.
-- **Audit**: We keep a secure log of *where* redactions happened, but we do not store the original sensitive data in our analytics outputs.
+- **Pseudonymization**: Source IDs are converted to stable hashes; usernames, source URLs, raw text, and exact source timestamps are excluded from analytics outputs.
+- **Audit**: We record where redactions happened without retaining the detected values in analytics outputs.
+
+This is a privacy-conscious engineering design, not a claim of HIPAA certification or formal HIPAA de-identification.
 
 ## 5. What This Data CAN Tell You
 - **Trends**: "Are complaints about rural partner employment increasing this year compared to last?"
@@ -47,10 +50,12 @@ Even though Reddit is public, we treat all data with HIPAA-aware standards.
 ## 6. What This Data CANNOT Tell You
 - **NOT Representative**: This is only the opinion of people who post on Reddit (typically younger, tech-savvy). It is not a random sample of all physicians.
 - **NOT Verification**: We cannot verify if a poster is actually a doctor.
+- **NOT Prevalence**: Targeted search terms intentionally oversample particular workforce concerns, so category and sentiment percentages do not estimate their prevalence among physicians.
+- **NOT Independent Responses**: Comments within the same discussion are clustered and should not be treated as independent survey participants.
 - **Correlation ≠ Causation**: Just because attrition mentions go up, it doesn't prove *why* without further investigation.
 
-## 7. How To Use This Dashboard
-Use the Power BI dashboard to **generate hypotheses**, not to make final decisions.
+## 7. How To Use The Outputs
+Use the Power BI-ready outputs to **generate hypotheses**, not to make final decisions.
 - *Wrong way*: "Reddit says retention is bad, so we must raise salaries."
 - *Right way*: "Reddit signals that partner employment is a rising concern. Let's add specific questions about spousal support to our next official survey to validate this."
 
@@ -60,5 +65,5 @@ graph LR
     Reddit[Reddit Data] --> Ingest[Python Pipeline]
     Ingest --> Analysis[AI Sentiment & Privacy Engine]
     Analysis --> Data[Clean CSV Data]
-    Data --> Dashboard[Power BI Dashboard]
+    Data --> Dashboard[Power BI-ready Analysis]
 ```
